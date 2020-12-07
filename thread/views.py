@@ -1,6 +1,8 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.generic import CreateView, FormView, DetailView, TemplateView, ListView
 from django.urls import reverse_lazy
+from django.db.models import Count # いいねのカウント
+from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage # ページネーション機能
 
 from . models import Topic
 from . models import Category
@@ -104,10 +106,12 @@ class TopicCreateView(CreateView):
         # ページ遷移のように見えるがURL自体は変わっていない（セッションに保存する必要がない）
         # confirm_topic.htmlもlocalhost/thread/create_topic/として表示される
 
-
+# カテゴリー表示用クラスビュー
 class CategoryView(ListView):
     template_name = 'thread/category.html'
     context_object_name = 'topic_list'
+    paginate_by = 1 # 1ページに表示するオブジェクト数 サンプルのため1にしています。
+    page_kwarg = 'p' # GETでページ数を受けるパラメータ名。指定しないと'page'がデフォルト
 
     def get_queryset(self):
         return Topic.objects.filter(category__url_code = self.kwargs['url_code'])
@@ -116,6 +120,29 @@ class CategoryView(ListView):
         ctx = super().get_context_data(**kwargs)
         ctx['category'] = get_object_or_404(Category, url_code=self.kwargs['url_code'])
         return ctx
+
+# カテゴリー表示用関数ビュー
+def show_catgegory(request, url_code):
+    if request.method == 'GET':
+        page_num = request.GET.get('p', 1)
+        pagenator = Paginator(
+            Topic.objects.filter(category__url_code=url_code),
+            1 # 1ページに表示するオブジェクト数
+        )
+        try:
+            page = pagenator.page(page_num)
+        except PageNotAnInteger:
+            page = pagenator.page(1)
+        except EmptyPage:
+            page = pagenator.page(pagenator.num_pages)
+
+        ctx = {
+            'category': get_object_or_404(Category, url_code=url_code),
+            'page_obj': page,
+            'topic_list': page.object_list, # pageでもOK
+            'is_paginated': page.has_other_pages,
+        }
+        return render(request, 'thread/category.html', ctx)
 
 
 # コメント投稿用view
@@ -140,7 +167,7 @@ class TopicAndCommentView(FormView):
         ctx = super().get_context_data()
         ctx['topic'] = Topic.objects.get(id=self.kwargs['pk'])
         ctx['comment_list'] = Comment.objects.filter(
-                topic_id=self.kwargs['pk']).order_by('no')
+            topic_id=self.kwargs['pk']).annotate(vote_count=Count('vote')).order_by('no')
         return ctx
 
 

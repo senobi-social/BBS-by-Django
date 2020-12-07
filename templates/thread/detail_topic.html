@@ -1,6 +1,7 @@
 {% extends 'base/base.html' %}
 {% block title %}トピック作成 - {{ block.super }}{% endblock %}
 {% block content %}
+{% load threadfilters %}
 <div class="ui grid stackable">
     <div class="eleven wide column">
         <div class="ui breadcrumb">
@@ -26,7 +27,15 @@
             <div class="ui segment secondary">
                 <p>{{comment.no}}. {{comment.user_name}}<br>{{comment.created}}</p>
                 {% if comment.pub_flg %}
-                <p>{{comment.message}}</p>
+                <p>{{comment.message | comment_filter | safe}}</p>
+                <div class="ui right aligned vertical segment">
+                    <div class="vote_button" style="cursor: pointer;" data-comment-id="{{comment.id}}" data-count="{{comment.vote_count}}">
+                        <i class="heart outline icon"></i>
+                        <span class="vote_counter">
+                            {% if comment.vote_count > 0 %}{{comment.vote_count}}{% endif %}
+                        </span>
+                    </div>
+                </div>
                 {% else %}
                 <p style="color: #aaa">このコメントは非表示となりました。</p>
                 {% endif %}
@@ -51,5 +60,12 @@
     {% include 'base/sidebar.html' %}
 </div>
 {% endblock %}
+<!-- ファイルの末尾に追加-->
+{% block js %}
+{% load static %}
+<script src="{% static 'js/vote.js' %}" type='text/javascript'></script>
+{% endblock %}
+
+
 
 
