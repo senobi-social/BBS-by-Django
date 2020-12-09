@@ -19,9 +19,13 @@ from django.urls import path, include
 from django.conf import settings # debug tool
 import base
 
+# サイトマップ
 from django.contrib.sitemaps.views import sitemap
 from thread.sitemaps import TopicSitemap, CategorySitemap
 from base.sitemaps import BaseSitemap
+
+# ファイルの取り扱い
+from django.conf.urls.static import static
   
 sitemaps = {
     'topic': TopicSitemap,
@@ -36,7 +40,7 @@ urlpatterns = [
     path('api/', include('api.urls')),
     path('search/', include('search.urls')),
     path('sitemap.xml', sitemap, {'sitemaps': sitemaps}), # サイトマップ
-]
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT) # ファイルの取り扱い
 
 if settings.DEBUG:
     import debug_toolbar

@@ -9,13 +9,20 @@
         </div>
         <div class="ui segment">
             <div class="content">
-                <div class="header"><h3>新着トピック</h3></div>
+                <div class="header"><h3>新着スレッド</h3></div>
                 <div class="ui divided items">
                     {% for topic in topic_list %}
                     <div class="item">
                         <div class="content">
                             <div class="header">
-                                <a href="{% url 'thread:topic' pk=topic.id %}"><h4>{{topic.title}}</h4></a>
+                                <a href="{% url 'thread:topic' pk=topic.id %}">
+                                    <h4>
+                                        {% if topic.id in new_list %}
+                                        <div class="ui violet horizontal label">new</div>
+                                        {% endif %}
+                                        {{topic.title}}
+                                    </h4>
+                                </a>
                             </div>
                             <div class="meta">
                                 <span class="name">{{topic.user_name}}</span>
@@ -31,4 +38,6 @@
     {% include 'base/sidebar.html' %}
 </div>
 {% endblock %}
+
+
 

@@ -4,10 +4,13 @@ from django.urls import reverse_lazy
 from django.db.models import Count # いいねのカウント
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage # ページネーション機能
 
+from django.core.mail import send_mail, EmailMessage # メール送信機能
+from django.template.loader import get_template
+
 from . models import Topic
 from . models import Category
 from . models import Comment
-from . forms import TopicCreateForm, TopicForm, CommentModelForm
+from . forms import TopicCreateForm, TopicForm, CommentModelForm, TopicModelForm
 
 class TopicDetailView(DetailView):
     template_name = 'thread/detail_topic.html'
@@ -98,6 +101,21 @@ class TopicCreateView(CreateView):
         if self.request.POST.get('next', '') == 'back':
             return render(self.request, 'thread/create_topic.html', ctx)
         if self.request.POST.get('next', '') == 'create':
+            # メール送信処理
+            template = get_template('thread/mail/topic_mail.html')
+            mail_ctx = {
+                'title': form.cleaned_data['title'],
+                'user_name': form.cleaned_data['user_name'],
+                'message': form.cleaned_data['message'],
+            }
+            EmailMessage(
+                subject = 'トピック作成:' + form.cleaned_data['title'],
+                body = template.render(mail_ctx),
+                from_email = 'hogehoge@example.com',
+                to = ['admin@example.com'],
+                cc = ['admin2@example.com'],
+                bcc = ['admin3@example.com'],
+            ).send()
             return super().form_valid(form) # 保存
         else:
             # 正常動作ではここは通らない。エラーページへの遷移でも良い
@@ -105,6 +123,61 @@ class TopicCreateView(CreateView):
 
         # ページ遷移のように見えるがURL自体は変わっていない（セッションに保存する必要がない）
         # confirm_topic.htmlもlocalhost/thread/create_topic/として表示される
+
+# セッションを使ったトピック投稿画面
+class TocicCreateViewBySession(FormView):
+    template_name = 'thread/create_topic.html'
+    form_class = TopicModelForm
+
+    def post(self, request, *args, **kwargs):
+        ctx = {}
+        if request.POST.get('next', '') == 'back':
+            if 'input_data' in self.request.session:
+                input_data = self.request.session['input_data']
+                form = TopicModelForm(input_data)
+                ctx['form'] = form
+            return render(request, self.template_name, ctx)
+        elif request.POST.get('next', '') == 'create':
+            if 'input_data' in request.session:
+                form = self.form_class(request.session['input_data'])
+                form.save()
+                # Topic.objects.create_topic(
+                #     title=request.session['input_data']['title'],
+                #     user_name=request.session['input_data']['user_name'],
+                #     category_id=request.session['input_data']['category'],
+                #     message=request.session['input_data']['message']
+                # )
+                # メール送信処理は省略
+                response = redirect(reverse_lazy('base:top'))
+                response.set_cookie('categ_id', request.session['input_data']['category'])
+                request.session.pop('input_data') # セッションに保管した情報の削除
+                return response
+        elif request.POST.get('next', '') == 'confirm':
+            form = TopicModelForm(request.POST)
+            if form.is_valid():
+                ctx = {'form': form}
+                # セッションにデータを保存
+                input_data = {
+                    'title': form.cleaned_data['title'],
+                    'user_name': form.cleaned_data['user_name'],
+                    'message': form.cleaned_data['message'],
+                    'category': form.cleaned_data['category'].id,
+                }
+                request.session['input_data'] = input_data
+                ctx['category'] = form.cleaned_data['category']
+                return render(request, 'thread/confirm_topic.html', ctx)
+            else:
+                return render(request, self.template_name, {'form': form})
+
+    def get_context_data(self):
+        ctx = super().get_context_data()
+        if 'categ_id' in self.request.COOKIES:
+            form = ctx['form']
+            form['category'].field.initial = self.request.COOKIES['categ_id']
+            ctx['form'] = form
+        return ctx
+
+
 
 # カテゴリー表示用クラスビュー
 class CategoryView(ListView):
@@ -170,4 +243,28 @@ class TopicAndCommentView(FormView):
             topic_id=self.kwargs['pk']).annotate(vote_count=Count('vote')).order_by('no')
         return ctx
 
+
+class TopicViewAndCommentCreateView(FormView):
+    template_name = 'thread/detail_topic.html'
+    form_class = CommentModelForm
+      
+    def form_valid(self, form):
+        Comment.objects.create_comment(
+            user_name=form.cleaned_data['user_name'],
+            message=form.cleaned_data['message'],
+            topic_id=self.kwargs['pk'],
+            image=form.cleaned_data['image']
+        )
+        response = super().form_valid(form)
+        return response
+  
+    def get_success_url(self):
+         return reverse_lazy('thread:topic', kwargs={'pk': self.kwargs['pk']})
+      
+    def get_context_data(self):
+        ctx = super().get_context_data()
+        ctx['topic'] = Topic.objects.get(id=self.kwargs['pk'])
+        ctx['comment_list'] = Comment.objects.filter(
+            topic_id=self.kwargs['pk']).annotate(vote_count=Count('vote')).order_by('no')
+        return ctx
 

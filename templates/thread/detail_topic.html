@@ -28,6 +28,9 @@
                 <p>{{comment.no}}. {{comment.user_name}}<br>{{comment.created}}</p>
                 {% if comment.pub_flg %}
                 <p>{{comment.message | comment_filter | safe}}</p>
+                {% if comment.image %}
+                <a href="{{comment.image.url}}" target="_blank" rel="noopener noreferrer"><img src="{{comment.image.url}}" width=200px></a>
+                {% endif %}
                 <div class="ui right aligned vertical segment">
                     <div class="vote_button" style="cursor: pointer;" data-comment-id="{{comment.id}}" data-count="{{comment.vote_count}}">
                         <i class="heart outline icon"></i>
@@ -49,7 +52,8 @@
         <!--コメント投稿-->
         <h4>コメント投稿</h4>
         <div class="ui segment">
-            <form class="ui form" action="" method="POST">
+            <!-- 元々はform class="ui form" action="" method="POST" -->
+            <form class="ui form" action="" method="POST" enctype="multipart/form-data">
                 {% csrf_token %}
                 {{form.as_p}}
                 <button class="ui button orange" type="submit">コメント投稿</button>

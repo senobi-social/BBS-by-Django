@@ -136,3 +136,12 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static')
 ]
+
+
+# コンソールバックエンドの設定
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+
+# ファイルの取り扱い
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_URL = '/media/'
